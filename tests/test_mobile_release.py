@@ -53,6 +53,12 @@ def test_touch_controls_keyboard_and_rotation(phone, static_site):
     page.set_viewport_size({"width": 320, "height": 310})
     dialog = page.get_by_role("dialog", name="新增任务")
     expect(dialog).to_be_visible()
+    # set_viewport_size can resolve before the visualViewport resize callback is delivered.
+    # Wait for the user-visible layout, then verify both dimensions below.
+    page.wait_for_function("""() => {
+        const bounds = document.querySelector('dialog.form-dialog[open]')?.getBoundingClientRect()
+        return bounds && bounds.height <= 310 && bounds.width <= 320
+    }""", timeout=5000)
     dialog_box = dialog.bounding_box()
     assert dialog_box["height"] <= 310 and dialog_box["width"] <= 320
     details = page.get_by_label("补充说明")
