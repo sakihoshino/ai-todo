@@ -53,12 +53,15 @@ git push origin local-first
 
 ## 本次发布状态
 
-V0.3 已通过本地发布检查，公开仓库已创建。站点采用 GitHub 提供的 HTTPS 域名，Pages 来源为 GitHub Actions，发布分支为 `local-first`。
+2026-11-24，V0.3 已从 `local-first` 成功发布到 GitHub Pages。仓库默认分支和 `github-pages` 环境的允许部署分支均为 `local-first`。Pages 来源为 GitHub Actions，已强制 HTTPS。[首次成功发布记录](https://github.com/sakihoshino/ai-todo/actions/runs/45344362691)
 
-- 本机测试共 99 项通过（20 项 TypeScript、79 项 Python 和浏览器测试），包含原有 79 项。
-- 两次独立构建在相同来源和子路径完成 service worker 切换，更新前后的 IndexedDB 记录一致。另实测关闭静态服务、退出 Chrome、断网重开后，任务可读取、完成并刷新保留。
-- iPhone 13 / Pixel 7 的模拟视口通过了 WebKit / Chromium 的触屏和离线测试。真实安装、系统键盘、屏幕安全区与后台回收仍需真机验收。应用沿用侧栏导航。
-- 使用示例 GitHub Pages 来源发往 DeepSeek 的真实 CORS 预检返回 200，允许 POST、Authorization 和 Content-Type。浏览器通过模拟来源的 HTTPS 页面、使用故意无效的凭据向官方端点发出请求，成功读取跨域 401。模型名、JSON Output、预览与异常通过受控响应验证，尚未在实际发布域名用有效密钥完成推理。
-- 发布检查只允许本项目的 12 个必要静态文件。当前构建通过文件、图片元数据及常见凭据检查。`.env`、旧库及备份继续保留在本地，并由 Git 忽略。
+| 验收项 | 实测结果 |
+| --- | --- |
+| 构建发布 | Mac 与 GitHub Linux 构建机分别通过 99 项测试。生产构建通过，12 个预期静态文件通过发布安全检查。 |
+| HTTPS 和安装入口 | 正式网址返回 200。manifest 的启动地址与 scope、已激活 service worker 的 scope 均指向 `/ai-todo/`。图标、脚本和样式可访问；manifest 使用 standalone，普通 Chrome 配置的安装错误列表为空。 |
+| 独立使用 | 关闭本机 FastAPI 和 Vite 预览，确认 8000 与 4173 端口停止监听后，以新浏览器配置打开正式站点。新增、编辑、完成、刷新保留、删除、导出及重新导入均通过；任务操作仅请求正式站点的静态资源。关闭页面并断网后再打开，service worker 提供页面，已恢复的任务仍可读取。 |
+| 数据与更新 | 同一来源的两个独立生产构建切换 service worker 后，任务 ID、完成状态和操作历史保持一致；流程纳入发布回归。 |
+| DeepSeek 跨域 | 正式来源的官方 CORS 预检返回 200，允许 POST、Authorization 和 Content-Type。Chrome 与 WebKit 均从正式页面直连官方接口，成功读取无效测试凭据对应的跨域 401 JSON；页面显示鉴权失败，任务和草稿数保持为 0。模型配置及成功响应使用受控响应验证，本次未以有效密钥进行计费推理。 |
+| 手机真机 | 已用 iPhone 13 / Pixel 7 尺寸验证 WebKit / Chromium 触屏和离线流程。系统安装、原生中文键盘和物理安全区留待实际手机确认。 |
 
 本次推送前复核了 V0.3 基线的三个提交、全部 121 个本地 Git 对象、59 个跟踪文件和 12 个静态产物。检查未发现真实凭据、个人邮箱、本机用户目录或私有数据库进入发布内容。三张旧图标带有文件系统时间戳；当前图标及发布产物已移除该元数据，旧提交保留原历史。

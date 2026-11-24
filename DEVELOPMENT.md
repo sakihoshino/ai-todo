@@ -54,7 +54,7 @@ python3 -m venv .venv
 
 浏览器测试优先使用本机 Chrome；若未安装，请使用 `.venv/bin/python -m playwright install chromium webkit`。本地 PWA 测试会把生产构建挂在临时 HTTP 服务的 `/AI-Todo/` 子路径，并使用独立浏览器上下文。旧版回归和迁移测试使用临时 SQLite。所有自动化测试都可在没有付费密钥的情况下运行。
 
-V0.2 基线通过 **20 项 TypeScript 测试**和 **59 项 Python/浏览器测试**（含原版 56 项）。验证了跨标签页重复确认、写入回滚、IndexedDB v1→v2 升级、SQLite→JSON→手机导入、离线冷刷新及增删改、状态与历史、DeepSeek 报文与错误、刷新后密钥清空。真实付费推理和公开站点发布待使用个人账户验证。旧版架构及验收记录见 [V0.1 开发说明](docs/v0.1-development.md)。
+V0.2 基线通过 **20 项 TypeScript 测试**和 **59 项 Python/浏览器测试**（含原版 56 项）。验证了跨标签页重复确认、写入回滚、IndexedDB v1→v2 升级、SQLite→JSON→手机导入、离线冷刷新及增删改、状态与历史、DeepSeek 报文与错误、刷新后密钥清空。该基线未使用有效密钥进行计费推理。旧版架构及验收记录见 [V0.1 开发说明](docs/v0.1-development.md)。
 
 Chrome 使用普通临时用户配置验证了 PWA 安装条件，浏览器返回的安装错误列表为空。另在 WebKit 27.2 的 390×844 触屏视口实际完成断网刷新、新增任务、再次刷新后读取。Pages 子路径的离线导航、图标和入口均随同一构建发布。
 
