@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8,<10
+# Starlette TestClient 的传输层，仅用于测试。
+httpx2>=2,<3
