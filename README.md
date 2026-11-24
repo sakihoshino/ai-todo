@@ -1,5 +1,7 @@
 # AI-Todo · 手机版 V0.3
 
+**[手机打开 AI-Todo](https://sakihoshino.github.io/ai-todo/)** · [GitHub 仓库](https://github.com/sakihoshino/ai-todo) · [安装与更新](DEPLOYMENT.md)
+
 用自然语言记下待办，确认后保存到这台手机的 IndexedDB。首次打开并完成离线缓存后，可从桌面图标打开，断网也能新增、整理、编辑、完成和删除任务。默认使用本地中文规则解析。需要在线 AI 时，可在当前页面启用 DeepSeek。
 
 ## 在本机试用
@@ -17,7 +19,7 @@ npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 
 ## 发布到 GitHub Pages 并添加到手机桌面
 
-配置 GitHub Pages 后，本版会从 `local-first` 自动发布。目前已完成本地验收，公开发布暂缓。GitHub Actions 会先运行测试和静态产物检查，再部署应用。手机使用 Pages 部署记录中的 HTTPS 地址。从主屏幕图标首次联网打开并缓存后，可关闭 Mac，继续在手机上管理任务。
+本版从 `local-first` 自动发布。GitHub Actions 会先运行测试和静态产物检查，再部署应用。手机使用 Pages 部署记录中的 HTTPS 地址。从主屏幕图标首次联网打开并缓存后，可关闭 Mac，继续在手机上管理任务。
 
 iPhone 使用 Safari 的「分享 → 添加到主屏幕」，Android 使用 Chrome 的「⋮ → 安装应用 / 添加到主屏幕」。详细步骤、更新方式与真机验收见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 

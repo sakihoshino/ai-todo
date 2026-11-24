@@ -1,5 +1,9 @@
 # GitHub Pages 发布与手机安装
 
+**手机入口**　[打开 AI-Todo](https://sakihoshino.github.io/ai-todo/)
+
+**源码与发布记录**　[公开仓库](https://github.com/sakihoshino/ai-todo) · [Pages 工作流](https://github.com/sakihoshino/ai-todo/actions/workflows/pages.yml)
+
 ## 发布内容
 
 发布来源为 `local-first` 分支。[工作流](.github/workflows/pages.yml) 会在该分支收到推送时运行，也可在 Actions 页面手动运行。工作流安装锁定依赖，运行前端、后端和浏览器回归测试，按 Pages 提供的路径构建 V0.3，并检查静态文件后部署。
@@ -49,7 +53,7 @@ git push origin local-first
 
 ## 本次发布状态
 
-V0.3 已完成本地验收。公开仓库创建、Git 推送、Pages 站点启用和线上访问验收按用户决定暂缓。目前没有公开仓库或站点地址。本机已安装 GitHub CLI 2.103.3，检查时未登录，项目未配置 Git 远程。本机预览地址仅用于开发。
+V0.3 已通过本地发布检查，公开仓库已创建。站点采用 GitHub 提供的 HTTPS 域名，Pages 来源为 GitHub Actions，发布分支为 `local-first`。
 
 - 本机测试共 99 项通过（20 项 TypeScript、79 项 Python 和浏览器测试），包含原有 79 项。
 - 两次独立构建在相同来源和子路径完成 service worker 切换，更新前后的 IndexedDB 记录一致。另实测关闭静态服务、退出 Chrome、断网重开后，任务可读取、完成并刷新保留。
@@ -57,4 +61,4 @@ V0.3 已完成本地验收。公开仓库创建、Git 推送、Pages 站点启�
 - 使用示例 GitHub Pages 来源发往 DeepSeek 的真实 CORS 预检返回 200，允许 POST、Authorization 和 Content-Type。浏览器通过模拟来源的 HTTPS 页面、使用故意无效的凭据向官方端点发出请求，成功读取跨域 401。模型名、JSON Output、预览与异常通过受控响应验证，尚未在实际发布域名用有效密钥完成推理。
 - 发布检查只允许本项目的 12 个必要静态文件。当前构建通过文件、图片元数据及常见凭据检查。`.env`、旧库及备份继续保留在本地，并由 Git 忽略。
 
-发布前对当时两个已有提交及本地 Git 对象进行了检查，未发现真实凭据、个人邮箱、本机用户名或私有数据库。三张旧图标带有文件系统时间戳；当前图标及发布产物已移除该元数据，旧提交保留原历史。
+本次推送前复核了 V0.3 基线的三个提交、全部 121 个本地 Git 对象、59 个跟踪文件和 12 个静态产物。检查未发现真实凭据、个人邮箱、本机用户目录或私有数据库进入发布内容。三张旧图标带有文件系统时间戳；当前图标及发布产物已移除该元数据，旧提交保留原历史。
