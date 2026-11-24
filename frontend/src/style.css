@@ -202,3 +202,22 @@ dialog::backdrop { background: rgb(34 44 34 / .29); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.header-tools { display: flex; gap: 6px; align-items: center; }
+.manual-add { display: inline-flex; align-items: center; gap: 5px; border-radius: 6px; min-height: 31px; padding: 0 11px; background: var(--green); color: white; font-size: 12px; white-space: nowrap; }
+.manual-add:hover:not(:disabled) { background: #304e3c; }
+.manual-add:disabled { opacity: .55; }
+.settings-caption { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.history-panel .secondary-btn { min-height: 31px; font-size: 12px; padding: 5px 9px; }
+.history-row { display: flex; gap: 13px; align-items: flex-start; border-bottom: 1px solid var(--line); padding: 14px 0; }
+.history-action { display: inline-flex; flex: none; align-items: center; padding: 3px 7px; color: #52694c; background: #e9eee2; font-size: 11px; border-radius: 5px; }
+.history-row strong { display: block; font-size: 14px; font-weight: 530; overflow-wrap: anywhere; }
+.history-row time { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+@media (max-width: 560px) {
+  .header-tools { gap: 2px; }
+  .list-heading:has(.manual-add) { display: grid; grid-template-columns: 1fr auto; }
+  .list-heading:has(.manual-add) .list-controls { display: contents; }
+  .list-heading:has(.manual-add) .manual-add { grid-column: 2; grid-row: 1; justify-self: end; min-height: 36px; }
+  .list-heading:has(.manual-add) .select-control { justify-self: start; width: max-content; }
+  .list-heading:has(.manual-add) .select-control:last-child { justify-self: end; }
+}

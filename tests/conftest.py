@@ -73,7 +73,6 @@ def server(tmp_path):
 
 @pytest.fixture(scope="session")
 def browser():
-    assert (ROOT / "frontend/dist/index.html").exists(), "请先运行前端构建"
     with sync_playwright() as driver:
         executable = os.environ.get("CHROME_PATH") or shutil.which("google-chrome")
         mac_chrome = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")

@@ -1,87 +1,53 @@
-# AI-Todo
+# AI-Todo · 手机版 V0.2
 
-AI-Todo 是在 macOS 本机运行的中文个人任务清单。写下一句话，预览拆分结果，调整后一次保存。默认使用本地 Mock 解析，可以直接体验整个流程。
+用自然语言记下待办，确认后保存到这台手机的 IndexedDB。首次打开并完成离线缓存后，可从桌面图标打开，断网也能新增、整理、编辑、完成和删除任务。默认使用本地中文规则解析。需要在线 AI 时，可在当前页面启用 DeepSeek。
 
-## 首次启动
+## 在本机试用
 
-需要 Python 3.11+、Node.js 20.19+（20.x）或 22.12 及以上版本 和 npm。第一次启动需要联网下载依赖。在本项目目录运行：
-
-```bash
-./start.sh
-```
-
-打开 **[http://127.0.0.1:8000](http://127.0.0.1:8000)**。保持终端运行，在终端按 Ctrl+C 退出。下次启动会复用虚拟环境和数据库。端口被占用时，可使用 `PORT=8010 ./start.sh`，并访问相应端口。
-
-脚本会创建项目专用的 `.venv/` 和 `backend/.env`，安装依赖、构建网页，并用 FastAPI 同时提供页面和 API。服务绑定本机回环地址。
-
-## 配置 DeepSeek
-
-先运行一次启动脚本，或执行 `cp -n backend/.env.example backend/.env`。在本机编辑器中打开 `backend/.env`，修改下列配置并重启服务。
-
-```dotenv
-AI_MODE=deepseek
-DEEPSEEK_API_KEY=在这里填入自己的密钥
-DEEPSEEK_MODEL=deepseek-flash
-APP_TIMEZONE=Asia/Shanghai
-DATABASE_PATH=data/tasks.sqlite3
-```
-
-密钥从 [DeepSeek 开放平台](https://platform.deepseek.com/) 获取。启用真实模式后，点击「AI 整理任务」会把本次输入发送给 DeepSeek，并按平台规则计费。浏览器仅调用本机服务，配置文件已加入 Git 忽略列表。若要继续离线使用，设置 `AI_MODE=mock`，重启即可。两种模式共享已保存的清单。
-
-后端调用 `POST https://api.deepseek.com/chat/completions`，使用环境变量指定的模型和 `response_format={"type":"json_object"}`。提示词包含 JSON 示例和本次调用的本地时间。空输出、截断内容和结构校验失败时，页面提示重试。[官方接入说明](https://api-docs.deepseek.com/) · [JSON Output](https://api-docs.deepseek.com/guides/json_mode/)
-
-## 使用
-
-1. 输入「明天写完数据库作业，周五之前提交社区实践周记，今天晚上背50个六级单词，还有空的时候看一下学长发来的论文。」
-2. 点击「AI 整理任务」。检查预览中的四项任务，可以修改标题、说明、分类、优先级和截止日期或时间，也可以删除其中一项。
-3. 确认保存后在清单中查看。勾选复选框完成任务，再次点击可恢复。清单支持编辑和删除。
-4. 用导航切换今日任务、全部任务、即将到期、已完成或分类，使用清单工具筛选和排序。全部任务含已完成的历史记录。
-
-「今日任务」显示配置时区下今天到期的待办。「即将到期」显示从明天到第七天（含）的待办。仅说「今天晚上」会记录今天，具体时刻留空。未给出的日期或时间也可在预览中手动补填。
-
-Mock 是方便本地试用的中文规则解析器，适合明确的动作、常见日期和分句。复杂语义请切换到真实模式。AI 解析只产生候选项，每次保存前请核对日期、分类和拆分结果。
-
-## 数据与配置
-
-| 项目 | 位置或含义 |
-| --- | --- |
-| 数据库 | 默认 `backend/data/tasks.sqlite3`，首次启动自动初始化 |
-| 更改数据库 | `DATABASE_PATH` 可为绝对路径，相对路径以 `backend/` 为起点 |
-| 时区 | `APP_TIMEZONE` 接受 IANA 名称，如 `Asia/Shanghai` |
-| 原始输入 | 随确认的任务保存在 SQLite 中 |
-| 备份 | 关闭服务后复制整个 `backend/data/` 目录；恢复时同样先关闭服务 |
-| 接口文档 | [本机 Swagger UI](http://127.0.0.1:8000/docs) |
-
-## 开发与测试
-
-开发时可以分别运行后端及 Vite。请先运行过一次 `./start.sh` 完成安装，并在切换到开发模式前停止该服务。
+使用 Node.js 22.12+ 和 npm。在项目根目录执行：
 
 ```bash
-# 终端一，在仓库根目录
-.venv/bin/python -m uvicorn app.main:app --app-dir backend --reload --port 8000
-
-# 终端二
 cd frontend
-npm run dev
+npm ci
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 ```
 
-浏览器打开 Vite 在终端打印的地址。前端通过开发代理访问后端。
+访问 **[http://127.0.0.1:4173](http://127.0.0.1:4173)**。这是生产构建的静态预览，可验证离线启动。日常开发用 `npm run dev` 启用 Vite 热更新。V0.2 的运行、安装与构建均可独立于 Python 服务。
 
-从仓库根目录运行全部验收测试：
+## 发布到 GitHub Pages 并添加到手机桌面
+
+1. 将此版本和仓库内的 `.github/workflows/pages.yml` 放到自己的 GitHub 仓库。手动运行的工作流需存在于默认分支。
+2. 在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
+3. 在 **Actions → Publish local-first PWA → Run workflow** 选择要发布的分支并运行。工作流自动匹配仓库子路径，上传目录为 `frontend/dist-local/`。
+4. 在手机上用 HTTPS 打开工作流输出的站点地址。iPhone 在 Safari 的分享菜单选「添加到主屏幕」，Android 在 Chrome 菜单选择「安装应用」或「添加到主屏幕」。第一次从桌面图标打开时请保持联网，让应用完成缓存，再测试飞行模式。
+
+也可将 `dist-local/` 放到其他静态 HTTPS 服务。子路径部署时，用实际路径重新构建，例如 `PAGES_BASE_PATH=/AI-Todo/ npm run build`。首次安装和服务工作线程需要 HTTPS，本机开发可使用 localhost 或 127.0.0.1。[GitHub Pages 工作流](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) · [PWA 安装条件](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)
+
+## 记录任务与使用 DeepSeek
+
+- **直接记录**　点击「新增任务」填写名称即可保存。
+- **拆分后确认**　输入「明天写完数据库作业，今天晚上背50个六级单词，有空时读论文」，点击「AI 整理任务」。可以逐项修改、移除，再统一保存。默认时区为 Asia/Shanghai，未给具体时间时保留空值。
+- **在线解析**　在右上角「解析设置」选择 DeepSeek，输入个人 API Key 和模型名（默认 `deepseek-flash`）。只有点击整理时，浏览器才会把本次输入和解析提示词发往 DeepSeek，费用按个人账户计费。密钥仅保留在本页内存中，刷新后需重新配置。请勿在代码、仓库变量或 Vite 构建环境中填写个人密钥。
+- **查看与管理**　侧栏支持日期、状态、分类筛选；「即将到期」指明天起七天内。清单支持截止日期排序和完成后恢复。手机上点击左上角打开导航。
+
+真实模式采用官方聊天接口与 JSON Output。上游异常时会保留输入，用户可重试或切回本地规则。[DeepSeek 官方说明](https://api-docs.deepseek.com/) · [JSON Output](https://api-docs.deepseek.com/guides/json_mode/)
+
+## 操作历史、备份与迁移
+
+「操作历史」可查看创建、编辑、完成、恢复、删除和导入记录，并导出任务和历史的 JSON 备份。清理浏览器网站数据、切换浏览器、换手机或更改站点来源，都可能需要重新导入。建议在日常使用的桌面图标中记录任务，并在清理或迁移前导出备份。备份含任务正文和原始输入，应按个人文件保管。
+
+**迁入 V0.1 任务**　从项目根目录执行以下命令。可以把第一个路径替换为 SQLite 备份的实际位置，输出路径须为新文件。
 
 ```bash
-.venv/bin/python -m pip install -r backend/requirements-dev.txt -r tests/requirements.txt
-(cd frontend && npm ci && npm run build)
-.venv/bin/python -m pytest -q backend/tests tests
+mkdir -p backups
+python3 scripts/export_sqlite.py backend/data/tasks.sqlite3 backups/legacy-tasks.json
 ```
 
-浏览器测试优先使用 macOS 上安装的 Google Chrome。也可以设置 `CHROME_PATH` 指向浏览器可执行文件，或运行 `.venv/bin/python -m playwright install chromium` 安装配套浏览器。测试创建临时 SQLite 数据库和独立后端进程，无需真实密钥。
+将 JSON 传到手机，在「操作历史 → 导入任务」中选择文件。导入保留 ID、分类、状态、原始输入和时间戳，已有 ID 会跳过。相同入口支持 V0.2 导出的 JSON。SQLite 文件仅需在迁移旧数据时读取。
 
-## 常见问题
+## 继续使用 V0.1
 
-- **真实模式提示缺少密钥**　确认修改的是 `backend/.env`，保存后重启后端。
-- **余额、限流或超时提示**　按页面提示处理账户或网络问题，再次点击整理。清单中只会出现已确认保存的任务。
-- **看不到刚保存的任务**　切换到「全部任务」并清除筛选。无截止日期的任务会出现在全部任务和相应分类中。
-- **脚本无法启动**　检查 `python3 --version`、`node --version`、`npm --version` 以及终端报告的端口占用或依赖下载错误。
+在项目根目录运行 `./start.sh`，访问 [http://127.0.0.1:8000](http://127.0.0.1:8000)。原有后端配置及 SQLite 数据继续使用，手机清单与旧库可通过文件迁移。[V0.1 使用说明](docs/v0.1.md)
 
-项目结构、接口约定与扩展入口见 [DEVELOPMENT.md](DEVELOPMENT.md)。
+测试命令、数据库分层、升级机制和验收记录见 [DEVELOPMENT.md](DEVELOPMENT.md)。

@@ -3,11 +3,15 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   ArrowDownUp, ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight,
   CircleAlert, ClipboardList, Feather, FileText, Languages, ListChecks, LoaderCircle,
-  Menu, PanelLeft, Pencil, SlidersHorizontal, Sparkles, Trash2, X,
+  Menu, PanelLeft, Pencil, Plus, Settings2, SlidersHorizontal, Sparkles, Trash2, X,
 } from '@lucide/vue'
 import Navigation from './components/Navigation.vue'
 import TaskEditor from './components/TaskEditor.vue'
-import { api, categories, dayOffset, editableFields, examples } from './tasks.js'
+import HistoryPanel from './components/HistoryPanel.vue'
+import ParserSettings from './components/ParserSettings.vue'
+import { legacy, listHistory, listTasks, parseInput, publicBase, readState, removeTask, saveBatch, settings, updateTask } from './workspace'
+import { createId, selectTasks } from './local/repository'
+import { categories, dayOffset, editableFields, examples } from './tasks.js'
 
 const tasks = ref([]), health = ref(null), loading = ref(true), loadError = ref('')
 const input = ref(''), inputEl = ref(null), drafts = ref([]), draftRaw = ref('')
@@ -17,10 +21,19 @@ const active = ref('all'), status = ref('全部状态'), sort = ref('due_asc')
 const editor = ref(null), editError = ref(''), editing = ref(false)
 const deleteTarget = ref(null), deleteDialog = ref(null), deleting = ref(false), deleteError = ref('')
 const rowBusy = ref({}), rowError = ref(''), navDialog = ref(null), toast = ref('')
+const history = ref([]), historyError = ref(''), historyLoading = ref(false)
+const settingsOpen = ref(false), online = ref(navigator.onLine)
+const inHistory = computed(() => !legacy && active.value === 'history')
+const pageTitle = computed(() => inHistory.value ? '操作历史' : '任务工作台')
+const onlineParserUnavailable = computed(() => !legacy && settings.mode === 'deepseek' && !online.value)
 let toastTimer, healthTimer
 const today = computed(() => health.value?.today || new Date().toLocaleDateString('sv-SE'))
 const todayLabel = computed(() => new Intl.DateTimeFormat('zh-CN', {year:'numeric',month:'long',day:'numeric',weekday:'long',timeZone:'UTC'}).format(new Date(today.value + 'T12:00:00Z')).replace('星期', ' · 星期'))
-const modeLabel = computed(() => !health.value ? '连接本地服务中' : health.value.mode === 'mock' ? 'Mock 模式' : health.value.configured ? 'DeepSeek 模式' : '待配置 API Key')
+const modeLabel = computed(() => {
+  if (!legacy) return !online.value ? '离线模式' : settings.mode === 'mock' ? '本地解析' : 'DeepSeek 模式'
+  if (!health.value) return '连接本地服务中'
+  return health.value.mode === 'mock' ? 'Mock 模式' : health.value.configured ? 'DeepSeek 模式' : '待配置 API Key'
+})
 const disabledKey = computed(() => health.value?.mode === 'deepseek' && !health.value.configured)
 const titles = {all:'全部任务',today:'今日任务',upcoming:'即将到期',completed:'已完成'}
 const viewTitle = computed(() => titles[active.value] || active.value)
@@ -36,26 +49,13 @@ function isUpcoming(task) {
   const n = dayOffset(task.due_date, today.value)
   return task.status === '待完成' && n >= 1 && n <= 7
 }
-const visibleTasks = computed(() => {
-  const list = tasks.value.filter(task => {
-    if (active.value === 'today') return task.due_date === today.value && task.status === '待完成'
-    if (active.value === 'upcoming') return isUpcoming(task)
-    if (active.value === 'completed') return task.status === '已完成'
-    return (active.value === 'all' || task.category === active.value) && (status.value === '全部状态' || task.status === status.value)
-  })
-  return list.sort((a,b) => {
-    if (sort.value !== 'created_desc') {
-      if (Boolean(a.due_date) !== Boolean(b.due_date)) return a.due_date ? -1 : 1
-      const dir = sort.value === 'due_asc' ? 1 : -1
-      const days = (a.due_date || '').localeCompare(b.due_date || '')
-      if (days) return dir * days
-      if (Boolean(a.due_time) !== Boolean(b.due_time)) return a.due_time ? -1 : 1
-      const hours = (a.due_time || '').localeCompare(b.due_time || '')
-      if (hours) return dir * hours
-    }
-    return b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id)
-  })
-})
+const visibleTasks = computed(() => selectTasks(tasks.value, {
+  view: active.value in titles ? active.value : 'all',
+  category: categories.find(([name]) => name === active.value)?.[0],
+  status: status.value === '全部状态' ? undefined : status.value,
+  sort: sort.value,
+  today: today.value,
+}))
 const hasPreview = computed(() => drafts.value.length > 0)
 const busyCompose = computed(() => parsing.value || saving.value)
 function navigate(key) {
@@ -63,31 +63,65 @@ function navigate(key) {
   status.value = '全部状态'
   rowError.value = ''
   navDialog.value?.close()
+  if (inHistory.value) refreshHistory()
 }
 async function initialize() {
   loading.value = true
   loadError.value = ''
   try {
-    const [state, list] = await Promise.all([api('health'), api('tasks')])
+    const [state, list] = await Promise.all([readState(), listTasks()])
     health.value = state
-    tasks.value = list.tasks
+    tasks.value = list
   } catch (e) { loadError.value = e.message }
   finally { loading.value = false }
 }
 async function refreshDate() {
   if (document.visibilityState === 'visible') {
-    try { health.value = await api('health') } catch { /* User actions report connection failures. */ }
+    try { health.value = await readState() } catch { /* User actions report connection failures. */ }
   }
+}
+async function refreshHistory() {
+  historyError.value = ''
+  historyLoading.value = true
+  try { history.value = await listHistory() }
+  catch (e) { historyError.value = e.message }
+  finally { historyLoading.value = false }
+}
+async function resumeWorkspace() {
+  if (document.visibilityState !== 'visible') return
+  await refreshDate()
+  if (!legacy) {
+    try {
+      tasks.value = await listTasks()
+      loadError.value = ''
+    } catch(e) { loadError.value = e.message }
+    if (inHistory.value) await refreshHistory()
+  }
+}
+function setConnectivity() { online.value = navigator.onLine }
+async function applySettings(value) {
+  Object.assign(settings, value)
+  settingsOpen.value = false
+  composeError.value = ''
+  await refreshDate()
 }
 onMounted(() => {
   initialize()
   healthTimer = setInterval(refreshDate, 60000)
-  document.addEventListener('visibilitychange', refreshDate)
+  document.addEventListener('visibilitychange', resumeWorkspace)
+  if (!legacy) {
+    window.addEventListener('focus', resumeWorkspace)
+    window.addEventListener('online', setConnectivity)
+    window.addEventListener('offline', setConnectivity)
+  }
 })
 onBeforeUnmount(() => {
   clearTimeout(toastTimer)
   clearInterval(healthTimer)
-  document.removeEventListener('visibilitychange', refreshDate)
+  document.removeEventListener('visibilitychange', resumeWorkspace)
+  window.removeEventListener('focus', resumeWorkspace)
+  window.removeEventListener('online', setConnectivity)
+  window.removeEventListener('offline', setConnectivity)
 })
 function inform(message) {
   toast.value = message
@@ -101,13 +135,12 @@ function useExample(text) {
   inputEl.value?.focus()
 }
 async function parse() {
-  if (!input.value.trim() || hasPreview.value || busyCompose.value || disabledKey.value || !health.value) return
+  if (!input.value.trim() || hasPreview.value || busyCompose.value || disabledKey.value || onlineParserUnavailable.value || !health.value) return
   composeError.value = composeInfo.value = ''
   parsing.value = true
   const raw = input.value
   try {
-    const data = await api('tasks/parse', {method:'POST',body:JSON.stringify({raw_input:raw})})
-    drafts.value = data.tasks.map(editableFields)
+    drafts.value = (await parseInput(raw)).map(editableFields)
     draftRaw.value = raw
     if (!hasPreview.value) composeInfo.value = '没有识别到可执行的任务，可以换个说法再试。'
     else {
@@ -128,22 +161,29 @@ async function saveDrafts() {
   composeError.value = ''
   const body = JSON.stringify({raw_input:draftRaw.value, tasks:drafts.value.map(editableFields)})
   if (lastBatch.value !== body) {
-    draftKey.value = crypto.randomUUID()
+    draftKey.value = createId()
     lastBatch.value = body
   }
   try {
-    const saved = await api('tasks/batch', {method:'POST',body,headers:{'Idempotency-Key':draftKey.value}})
-    tasks.value = [...saved.tasks, ...tasks.value.filter(t => !saved.tasks.some(s => s.id === t.id))]
+    const saved = await saveBatch(draftRaw.value, drafts.value.map(editableFields), draftKey.value)
+    tasks.value = [...saved, ...tasks.value.filter(t => !saved.some(s => s.id === t.id))]
     navigate('all')
     drafts.value = []
     input.value = draftRaw.value = draftKey.value = lastBatch.value = ''
-    inform('已保存 ' + saved.tasks.length + ' 项任务')
+    inform('已保存 ' + saved.length + ' 项任务')
   } catch(e) { composeError.value = e.message }
   finally { saving.value = false }
 }
 function openEditor(task, index = null) {
   editError.value = ''
   editor.value = {task, index}
+}
+function newTask() {
+  editError.value = ''
+  editor.value = {creating: true, key: createId(), index: null, task: {
+    title: '', description: '', category: categories.some(([name]) => name === active.value) ? active.value : '其他',
+    due_date: active.value === 'today' ? today.value : null, due_time: null, priority: '中',
+  }}
 }
 function replaceTask(task) {
   tasks.value = tasks.value.map(t => t.id === task.id ? task : t)
@@ -158,9 +198,16 @@ async function saveEdit(fields) {
   }
   editing.value = true
   try {
-    replaceTask(await api('tasks/' + editor.value.task.id, {method:'PATCH',body:JSON.stringify(fields)}))
+    if (editor.value.creating) {
+      const saved = await saveBatch(fields.title, [fields], editor.value.key)
+      tasks.value = [...saved, ...tasks.value]
+      navigate('all')
+      inform('任务已创建')
+    } else {
+      replaceTask(await updateTask(editor.value.task.id, fields))
+      inform('任务已更新')
+    }
     editor.value = null
-    inform('任务已更新')
   } catch(e) { editError.value = e.message }
   finally { editing.value = false }
 }
@@ -169,7 +216,7 @@ async function toggle(task) {
   rowBusy.value[task.id] = true
   rowError.value = ''
   try {
-    replaceTask(await api('tasks/' + task.id, {method:'PATCH',body:JSON.stringify({status:task.status === '待完成' ? '已完成' : '待完成'})}))
+    replaceTask(await updateTask(task.id, {status:task.status === '待完成' ? '已完成' : '待完成'}))
   } catch(e) { rowError.value = e.message }
   finally { delete rowBusy.value[task.id] }
 }
@@ -182,7 +229,7 @@ async function confirmDelete() {
   if (deleting.value || !deleteTarget.value) return
   deleting.value = true
   try {
-    await api('tasks/' + deleteTarget.value.id, {method:'DELETE'})
+    await removeTask(deleteTarget.value.id)
     tasks.value = tasks.value.filter(t => t.id !== deleteTarget.value.id)
     deleteDialog.value.close()
     inform('任务已删除')
@@ -206,33 +253,42 @@ const categoryColor = name => categories.find(([key]) => key === name)?.[1]
       <header class="topbar">
         <div class="breadcrumbs flex items-center">
           <button class="icon-btn mobile-nav-btn" aria-label="打开导航" @click="navDialog.showModal()"><Menu :size="20"/></button>
-          <PanelLeft class="desktop-crumb" :size="16"/><span>个人空间</span><ChevronRight :size="12"/><strong>任务工作台</strong>
+          <PanelLeft class="desktop-crumb" :size="16"/><span>个人空间</span><ChevronRight :size="12"/><strong>{{ pageTitle }}</strong>
         </div>
-        <span class="mode-indicator" :class="{ offline: disabledKey || loadError }"><i></i>{{ loadError && !health ? '服务未连接' : modeLabel }}</span>
+        <div class="header-tools">
+          <span class="mode-indicator" :class="{ offline: disabledKey || loadError || (!legacy && !online) }"><i></i>{{ loadError && !health ? (legacy ? '服务未连接' : '本地存储异常') : modeLabel }}</span>
+          <button v-if="!legacy" class="icon-btn" aria-label="解析设置" title="解析设置" :disabled="busyCompose" @click="settingsOpen = true"><Settings2 :size="17"/></button>
+        </div>
       </header>
       <main>
         <div class="page-heading">
-          <h1>任务工作台</h1>
+          <h1>{{ pageTitle }}</h1>
           <span class="date-stamp"><CalendarDays :size="15"/>{{ todayLabel }}</span>
         </div>
+        <template v-if="inHistory">
+          <p v-if="historyError" role="alert" class="error-message">{{ historyError }} <button class="text-btn" @click="refreshHistory">重试</button></p>
+          <HistoryPanel v-else :entries="history" :loading="historyLoading" @imported="resumeWorkspace"/>
+        </template>
+        <template v-else>
         <section class="composer" aria-labelledby="composer-title">
-          <img src="/desk-note.webp" alt="" class="notebook-art">
+          <img :src="publicBase + 'desk-note.webp'" alt="" class="notebook-art">
           <div class="composer-content">
             <div class="composer-title"><Feather :size="22" :stroke-width="1.6"/><h2 id="composer-title">AI 快速记录</h2></div>
-            <p class="composer-intro">写下待办，AI 帮你拆分和分类。</p>
+            <p class="composer-intro">{{ !legacy && settings.mode === 'mock' ? '写下待办，在设备上拆分和分类。' : '写下待办，AI 帮你拆分和分类。' }}</p>
             <div class="capture-box">
               <textarea ref="inputEl" v-model="input" placeholder="今天有什么想做的？直接告诉我就好。" aria-label="任务输入" maxlength="4000" :readonly="busyCompose || hasPreview"
                 @input="composeError = composeInfo = ''" @keydown.meta.enter.prevent="parse" @keydown.ctrl.enter.prevent="parse"></textarea>
               <div class="capture-actions">
                 <button type="button" class="sample-link" :disabled="busyCompose || hasPreview" @click="useExample('明天写完数据库作业，周五之前提交社区实践周记，今天晚上背50个六级单词，还有空的时候看一下学长发来的论文。')">试试示例<ArrowRight :size="13"/></button>
-                <button class="primary-btn parse-btn" :aria-busy="parsing" :disabled="busyCompose || hasPreview || disabledKey || !health || !input.trim()" @click="parse">
+                <button class="primary-btn parse-btn" :aria-busy="parsing" :disabled="busyCompose || hasPreview || disabledKey || onlineParserUnavailable || !health || !input.trim()" @click="parse">
                   <LoaderCircle v-if="parsing" class="spin" :size="15"/><Sparkles v-else :size="15"/>{{ parsing ? '正在整理…' : 'AI 整理任务' }}
                 </button>
               </div>
             </div>
           </div>
         </section>
-        <p v-if="disabledKey || (health?.mode === 'mock' && !health.configured)" class="mode-note"><CircleAlert :size="14"/><span>{{ disabledKey ? '请在 backend/.env 填写 DEEPSEEK_API_KEY 并重启服务，或切换到 Mock 模式。' : '当前使用本地 Mock 解析。配置 DeepSeek API Key 后可切换为 AI 解析。' }}</span></p>
+        <p v-if="legacy && (disabledKey || (health?.mode === 'mock' && !health.configured))" class="mode-note"><CircleAlert :size="14"/><span>{{ disabledKey ? '请在 backend/.env 填写 DEEPSEEK_API_KEY 并重启服务，或切换到 Mock 模式。' : '当前使用本地 Mock 解析。配置 DeepSeek API Key 后可切换为 AI 解析。' }}</span></p>
+        <p v-if="onlineParserUnavailable" class="mode-note"><CircleAlert :size="14"/>设备已离线。可手动新增任务，或在解析设置中切换至本地规则。</p>
         <p v-if="composeInfo" class="info-message" role="status">{{ composeInfo }}</p>
         <p v-if="composeError && !hasPreview" class="error-message" role="alert">{{ composeError }}</p>
 
@@ -255,6 +311,7 @@ const categoryColor = name => categories.find(([key]) => key === name)?.[1]
           <div class="list-heading">
             <div class="list-title"><h2 id="list-title">{{ viewTitle }}</h2><span class="list-count">{{ visibleTasks.length }}</span></div>
             <div class="list-controls">
+              <button v-if="!legacy" class="manual-add" :disabled="loading || !!loadError" @click="newTask"><Plus :size="14"/>新增任务</button>
               <label v-if="!lockedStatus" class="select-control"><SlidersHorizontal :size="14"/><select v-model="status" aria-label="按完成状态筛选"><option>全部状态</option><option>待完成</option><option>已完成</option></select><ChevronDown :size="12"/></label>
               <label class="select-control"><ArrowDownUp :size="14"/><select v-model="sort" aria-label="排序方式"><option value="due_asc">截止日期升序</option><option value="due_desc">截止日期降序</option><option value="created_desc">最近创建</option></select><ChevronDown :size="12"/></label>
             </div>
@@ -287,9 +344,11 @@ const categoryColor = name => categories.find(([key]) => key === name)?.[1]
           </div>
           <div v-else class="simple-empty"><ListChecks :size="29" :stroke-width="1.5"/><strong>暂无符合条件的任务</strong><button class="text-btn" @click="navigate('all')">查看全部任务 <ArrowRight :size="13"/></button></div>
         </section>
+        </template>
       </main>
     </div>
-    <TaskEditor v-if="editor" :task="editor.task" :busy="editing" :error="editError" @save="saveEdit" @close="editor = null"/>
+    <ParserSettings v-if="settingsOpen && !legacy" @save="applySettings" @close="settingsOpen = false"/>
+    <TaskEditor v-if="editor" :creating="editor.creating" :task="editor.task" :busy="editing" :error="editError" @save="saveEdit" @close="editor = null"/>
     <dialog ref="deleteDialog" class="form-dialog delete-dialog" aria-labelledby="delete-heading" @cancel="deleting && $event.preventDefault()">
       <h2 id="delete-heading">删除这项任务？</h2><p class="delete-detail">「{{ deleteTarget?.title }}」将从清单中永久移除。</p>
       <p v-if="deleteError" class="error-message" role="alert">{{ deleteError }}</p>

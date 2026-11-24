@@ -29,7 +29,7 @@ if [ ! -d node_modules ] || [ ! -e node_modules/.app-installed ] || [ package-lo
   touch node_modules/.app-installed
 fi
 if [ ! -f dist/index.html ] || [ -n "$(find src public index.html vite.config.* package*.json -newer dist/index.html -print -quit)" ]; then
-  npm run build
+  npm run build:legacy
 fi
 cd "$root_dir/backend"
 echo "AI-Todo 访问地址 http://127.0.0.1:${port}（按 Ctrl+C 停止）"
