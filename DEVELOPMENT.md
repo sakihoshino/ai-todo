@@ -1,4 +1,4 @@
-# AI-Todo V0.2 开发说明
+# AI-Todo V0.3 开发说明
 
 开发分支为 `local-first`，起点为 V0.1 的 `16276a1`。同一套 Vue 页面可构建为独立 PWA 或原版 FastAPI 客户端。
 
@@ -22,7 +22,7 @@
 | `backend/app/prompts/task_parser.txt` | 两个版本共用的提示词，Vite 仅读取此文件并编入静态客户端 |
 | `frontend/vite.config.js` | PWA 插件、静态资源基路径、旧版代理与构建目录 |
 | `scripts/export_sqlite.py` | 以只读连接导出旧版完整任务 JSON |
-| `.github/workflows/pages.yml` | 手动构建和发布静态站点 |
+| `.github/workflows/pages.yml` | local-first 推送触发测试、静态检查与发布 |
 | `frontend/tests/`、`tests/test_local_pwa.py` | TypeScript 单元测试、静态子路径和离线浏览器验收 |
 
 ## 存储与迁移
@@ -52,8 +52,14 @@ python3 -m venv .venv
 .venv/bin/python -m pytest -q backend/tests tests
 ```
 
-浏览器测试优先使用本机 Chrome；若未安装，请使用 `.venv/bin/python -m playwright install chromium`。本地 PWA 测试会把生产构建挂在临时 HTTP 服务的 `/AI-Todo/` 子路径，并使用独立浏览器上下文。旧版回归和迁移测试使用临时 SQLite。所有自动化测试都可在没有付费密钥的情况下运行。
+浏览器测试优先使用本机 Chrome；若未安装，请使用 `.venv/bin/python -m playwright install chromium webkit`。本地 PWA 测试会把生产构建挂在临时 HTTP 服务的 `/AI-Todo/` 子路径，并使用独立浏览器上下文。旧版回归和迁移测试使用临时 SQLite。所有自动化测试都可在没有付费密钥的情况下运行。
 
-本轮通过 **20 项 TypeScript 测试**和 **59 项 Python/浏览器测试**（含原版 56 项）。验证了跨标签页重复确认、写入回滚、IndexedDB v1→v2 升级、SQLite→JSON→手机导入、离线冷刷新及增删改、状态与历史、DeepSeek 报文与错误、刷新后密钥清空。真实付费推理和公开站点发布待使用个人账户验证。旧版架构及验收记录见 [V0.1 开发说明](docs/v0.1-development.md)。
+V0.2 基线通过 **20 项 TypeScript 测试**和 **59 项 Python/浏览器测试**（含原版 56 项）。验证了跨标签页重复确认、写入回滚、IndexedDB v1→v2 升级、SQLite→JSON→手机导入、离线冷刷新及增删改、状态与历史、DeepSeek 报文与错误、刷新后密钥清空。真实付费推理和公开站点发布待使用个人账户验证。旧版架构及验收记录见 [V0.1 开发说明](docs/v0.1-development.md)。
 
 Chrome 使用普通临时用户配置验证了 PWA 安装条件，浏览器返回的安装错误列表为空。另在 WebKit 27.2 的 390×844 触屏视口实际完成断网刷新、新增任务、再次刷新后读取。Pages 子路径的离线导航、图标和入口均随同一构建发布。
+
+## V0.3 发布维护
+
+本版沿用现有任务模型、数据库名和版本。静态发布及手机安装手册见 [DEPLOYMENT.md](DEPLOYMENT.md)。Pages 工作流从 `local-first` 运行，只上传通过检查的静态目录。任务功能不需要部署后端服务。
+
+V0.3 本机验收通过 99 项测试。新增的 20 项覆盖 14 个发布产物检查场景、4 个双引擎手机场景、一次实际 service worker 升级，以及一组上游失败测试。工作流安装 Chromium 和 WebKit，并构建 legacy 前端以运行旧版回归。手机验收使用隔离数据；发布和线上验收状态记录于部署手册。

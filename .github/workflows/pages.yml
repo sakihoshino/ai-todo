@@ -1,35 +1,65 @@
 name: Publish local-first PWA
+
 on:
+  push:
+    branches: [local-first]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Let a publication in progress finish; retain the newest queued update.
+concurrency:
+  group: ai-todo-pages
+  cancel-in-progress: false
+
 jobs:
   build:
+    if: github.ref == 'refs/heads/local-first'
+    runs-on: ubuntu-24.04
     permissions:
       pages: read
       contents: read
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: actions/configure-pages@v5
-        id: pages
-      - run: npm ci && npm test && npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r backend/requirements-dev.txt -r tests/requirements.txt
+          python -m playwright install --with-deps chromium webkit
+      - name: Test local storage, parsing and browser workflows
+        run: |
+          npm --prefix frontend test
+          npm --prefix frontend run build:legacy
+          python -m pytest -q backend/tests tests
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Build the static phone app
+        run: npm run build
         working-directory: frontend
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+      - name: Inspect release contents
+        run: python scripts/check_release.py frontend/dist-local
       - uses: actions/upload-pages-artifact@v4
         with:
           path: frontend/dist-local
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
@@ -37,6 +67,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Deploy
+      - name: Deploy to Pages
         id: deploy
         uses: actions/deploy-pages@v4

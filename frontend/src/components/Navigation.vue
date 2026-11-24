@@ -30,6 +30,6 @@ const views = [
         <i class="category-dot" :style="{ background: color }"></i>{{ name }}
       </button>
     </nav>
-    <div class="local-space"><LaptopMinimal :size="18"/><span>本地工作区</span><small>{{ legacy ? 'V0.1' : 'V0.2' }}</small></div>
+    <div class="local-space"><LaptopMinimal :size="18"/><span>本地工作区</span><small>{{ legacy ? 'V0.1' : 'V0.3' }}</small></div>
   </div>
 </template>

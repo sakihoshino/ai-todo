@@ -18,3 +18,18 @@ test-results/
 playwright-report/
 backups/
 dist-local/
+
+# Mobile task exports, release downloads and local credentials
+AI-Todo-*.json
+legacy-tasks*.json
+exports/
+secrets/
+*.pem
+*.p12
+*.pfx
+*.key
+.npmrc.local
+.envrc
+.npmrc
+tasks.json
+tasks-*.json

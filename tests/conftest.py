@@ -12,6 +12,8 @@ from urllib.request import urlopen
 import pytest
 from playwright.sync_api import sync_playwright
 
+from pages_build import build_pages, serve_pages
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -72,12 +74,25 @@ def server(tmp_path):
 
 
 @pytest.fixture(scope="session")
-def browser():
+def playwright_driver():
     with sync_playwright() as driver:
-        executable = os.environ.get("CHROME_PATH") or shutil.which("google-chrome")
-        mac_chrome = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
-        if not executable and mac_chrome.is_file():
-            executable = str(mac_chrome)
-        instance = driver.chromium.launch(executable_path=executable)
-        yield instance
-        instance.close()
+        yield driver
+
+
+@pytest.fixture(scope="session")
+def browser(playwright_driver):
+    executable = os.environ.get("CHROME_PATH") or shutil.which("google-chrome")
+    mac_chrome = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+    if not executable and mac_chrome.is_file():
+        executable = str(mac_chrome)
+    instance = playwright_driver.chromium.launch(executable_path=executable)
+    yield instance
+    instance.close()
+
+
+@pytest.fixture(scope="session")
+def static_site(tmp_path_factory):
+    root = tmp_path_factory.mktemp("static-pages")
+    build_pages(root / "AI-Todo")
+    with serve_pages(root) as url:
+        yield url

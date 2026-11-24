@@ -98,6 +98,14 @@ async function resumeWorkspace() {
     if (inHistory.value) await refreshHistory()
   }
 }
+// On iOS the keyboard can resize and pan the visual viewport without changing 100dvh.
+function updateDialogViewport() {
+  const viewport = window.visualViewport
+  if (!viewport) return
+  const style = document.documentElement.style
+  style.setProperty('--visible-height', viewport.height + 'px')
+  style.setProperty('--visible-top', viewport.offsetTop + 'px')
+}
 function setConnectivity() { online.value = navigator.onLine }
 async function applySettings(value) {
   Object.assign(settings, value)
@@ -107,6 +115,9 @@ async function applySettings(value) {
 }
 onMounted(() => {
   initialize()
+  updateDialogViewport()
+  window.visualViewport?.addEventListener('resize', updateDialogViewport)
+  window.visualViewport?.addEventListener('scroll', updateDialogViewport)
   healthTimer = setInterval(refreshDate, 60000)
   document.addEventListener('visibilitychange', resumeWorkspace)
   if (!legacy) {
@@ -118,6 +129,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearTimeout(toastTimer)
   clearInterval(healthTimer)
+  window.visualViewport?.removeEventListener('resize', updateDialogViewport)
+  window.visualViewport?.removeEventListener('scroll', updateDialogViewport)
   document.removeEventListener('visibilitychange', resumeWorkspace)
   window.removeEventListener('focus', resumeWorkspace)
   window.removeEventListener('online', setConnectivity)

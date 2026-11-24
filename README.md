@@ -1,4 +1,4 @@
-# AI-Todo · 手机版 V0.2
+# AI-Todo · 手机版 V0.3
 
 用自然语言记下待办，确认后保存到这台手机的 IndexedDB。首次打开并完成离线缓存后，可从桌面图标打开，断网也能新增、整理、编辑、完成和删除任务。默认使用本地中文规则解析。需要在线 AI 时，可在当前页面启用 DeepSeek。
 
@@ -13,14 +13,13 @@ npm run build
 npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 ```
 
-访问 **[http://127.0.0.1:4173](http://127.0.0.1:4173)**。这是生产构建的静态预览，可验证离线启动。日常开发用 `npm run dev` 启用 Vite 热更新。V0.2 的运行、安装与构建均可独立于 Python 服务。
+访问 **[http://127.0.0.1:4173](http://127.0.0.1:4173)**。这是生产构建的静态预览，可验证离线启动。日常开发用 `npm run dev` 启用 Vite 热更新。V0.3 的运行、安装与构建均可独立于 Python 服务。
 
 ## 发布到 GitHub Pages 并添加到手机桌面
 
-1. 将此版本和仓库内的 `.github/workflows/pages.yml` 放到自己的 GitHub 仓库。手动运行的工作流需存在于默认分支。
-2. 在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
-3. 在 **Actions → Publish local-first PWA → Run workflow** 选择要发布的分支并运行。工作流自动匹配仓库子路径，上传目录为 `frontend/dist-local/`。
-4. 在手机上用 HTTPS 打开工作流输出的站点地址。iPhone 在 Safari 的分享菜单选「添加到主屏幕」，Android 在 Chrome 菜单选择「安装应用」或「添加到主屏幕」。第一次从桌面图标打开时请保持联网，让应用完成缓存，再测试飞行模式。
+配置 GitHub Pages 后，本版会从 `local-first` 自动发布。目前已完成本地验收，公开发布暂缓。GitHub Actions 会先运行测试和静态产物检查，再部署应用。手机使用 Pages 部署记录中的 HTTPS 地址。从主屏幕图标首次联网打开并缓存后，可关闭 Mac，继续在手机上管理任务。
+
+iPhone 使用 Safari 的「分享 → 添加到主屏幕」，Android 使用 Chrome 的「⋮ → 安装应用 / 添加到主屏幕」。详细步骤、更新方式与真机验收见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 
 也可将 `dist-local/` 放到其他静态 HTTPS 服务。子路径部署时，用实际路径重新构建，例如 `PAGES_BASE_PATH=/AI-Todo/ npm run build`。首次安装和服务工作线程需要 HTTPS，本机开发可使用 localhost 或 127.0.0.1。[GitHub Pages 工作流](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) · [PWA 安装条件](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)
 

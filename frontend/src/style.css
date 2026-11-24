@@ -149,7 +149,7 @@ dialog::backdrop { background: rgb(34 44 34 / .29); }
   .notebook-art { width: 30%; }
   .example-card { padding: 12px; }
 }
-@media (max-width: 760px) {
+@media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
   .desktop-sidebar, .desktop-crumb { display: none; }
   .mobile-nav-btn { display: inline-flex; margin-left: -6px; }
   .topbar { min-height: 53px; padding-inline: 21px; }
@@ -220,4 +220,42 @@ dialog::backdrop { background: rgb(34 44 34 / .29); }
   .list-heading:has(.manual-add) .manual-add { grid-column: 2; grid-row: 1; justify-self: end; min-height: 36px; }
   .list-heading:has(.manual-add) .select-control { justify-self: start; width: max-content; }
   .list-heading:has(.manual-add) .select-control:last-child { justify-self: end; }
+}
+
+
+/* Keep controls outside notches in standalone and browser views. */
+@media (max-width: 760px), (pointer: coarse) {
+  .workspace { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
+  main { padding-bottom: calc(42px + env(safe-area-inset-bottom, 0px)); }
+  .drawer[open] { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+  .toast { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: 90vw; white-space: normal; }
+  .form-dialog {
+    --top-inset: env(safe-area-inset-top, 0px);
+    --bottom-inset: env(safe-area-inset-bottom, 0px);
+    --dialog-height: calc(var(--visible-height, 100dvh) - var(--top-inset) - var(--bottom-inset));
+    inset: auto env(safe-area-inset-right, 0px) auto env(safe-area-inset-left, 0px);
+    top: calc(var(--visible-top, 0px) + var(--top-inset) + var(--dialog-height) / 2);
+    transform: translateY(-50%); margin: 0 auto;
+    max-height: calc(var(--dialog-height) - 16px);
+    width: min(450px, calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px));
+    overscroll-behavior: contain; scroll-padding-block: 14px;
+  }
+  .drawer .brand { padding-block: 15px; }
+  .drawer .nav-item, .drawer .local-space { min-height: 44px; }
+  .drawer .local-space { padding-block: 10px; }
+  .icon-btn, .row-actions .icon-btn, .primary-btn, .secondary-btn, .danger-btn,
+  .sample-link, .text-btn, .select-control, .manual-add, .list-heading:has(.manual-add) .manual-add,
+  .history-panel .secondary-btn, .draft-title, .edit-grid input, .edit-grid select { min-height: 44px; }
+  .icon-btn, .row-actions .icon-btn, .sample-link, .text-btn { min-width: 44px; }
+  .task-check { position: relative; min-width: 44px; height: 44px; margin: -9px -5px 0 -7px; }
+  .task-check, .done .task-check { background: transparent; border: 0; }
+  .task-check::before { content: ''; position: absolute; width: 21px; height: 21px; border-radius: 5px; border: 1.5px solid #a5b19c; background: #fffffc; }
+  .done .task-check::before { background: #69816b; border-color: #69816b; }
+  .task-check::after { display: none; }
+  .task-check svg { position: relative; }
+}
+@media (max-width: 375px) {
+  .breadcrumbs > span, .breadcrumbs > svg { display: none; }
+  .header-tools, .breadcrumbs { gap: 2px; }
+  .form-dialog { padding: 16px; }
 }

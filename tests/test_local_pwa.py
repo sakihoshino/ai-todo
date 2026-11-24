@@ -1,41 +1,10 @@
 """在 GitHub Pages 风格的子路径运行生产构建，不启动 FastAPI。"""
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import subprocess
-from threading import Thread
 
-import pytest
 from playwright.sync_api import expect
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-class QuietStaticFiles(SimpleHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        pass
-
-
-@pytest.fixture(scope="module")
-def static_site(tmp_path_factory):
-    import os
-
-    root = tmp_path_factory.mktemp("static-pages")
-    subprocess.run(
-        ["npm", "run", "build", "--", "--outDir", str(root / "AI-Todo")],
-        env={**os.environ, "PAGES_BASE_PATH": "/AI-Todo/"},
-        cwd=ROOT / "frontend", check=True,
-    )
-    handler = partial(QuietStaticFiles, directory=str(root))
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{httpd.server_port}/AI-Todo/"
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
-        thread.join()
 
 
 def test_installed_shell_offline_lifecycle(browser, static_site):
@@ -115,6 +84,7 @@ def test_real_parser_preview_without_persisting_credentials(browser, static_site
         page.get_by_role("button", name="解析设置").click()
         page.get_by_label("解析方式").select_option("deepseek")
         page.get_by_label("DeepSeek API Key").fill("test-session-key")
+        page.get_by_label("模型名称").fill("test-model-override")
         page.get_by_role("button", name="应用设置").click()
         page.get_by_placeholder("今天有什么想做的？直接告诉我就好。").fill("整理实验结果")
         page.get_by_role("button", name="AI 整理任务").click()
@@ -122,6 +92,8 @@ def test_real_parser_preview_without_persisting_credentials(browser, static_site
         expect(page.get_by_test_id("task-row")).to_have_count(0)
         assert len(upstream) == 1
         assert upstream[0].headers["authorization"] == "Bearer test-session-key"
+        assert upstream[0].post_data_json["model"] == "test-model-override"
+        assert "Asia/Shanghai" in upstream[0].post_data_json["messages"][0]["content"]
         assert upstream[0].post_data_json["response_format"] == {"type": "json_object"}
         page.get_by_role("button", name="确认保存").click()
         expect(page.get_by_test_id("task-row")).to_have_count(1)
@@ -171,3 +143,63 @@ def test_sqlite_to_mobile_backup(browser, static_site, server, tmp_path):
         expect(page.get_by_test_id("task-row")).to_have_count(1)
     finally:
         page.close()
+
+
+def test_live_errors_do_not_create_previews_or_records(browser, static_site):
+    """Exercise production fetch/error UI with deterministic upstream responses."""
+    context = browser.new_context(service_workers="block")
+    page = context.new_page()
+    cases = [
+        ("auth", "鉴权失败"),
+        ("balance", "余额不足"),
+        ("limit", "过于频繁"),
+        ("unavailable", "暂不可用"),
+        ("timeout", "响应超时"),
+        ("network", "检查网络"),
+        ("json", "任务字段无效"),
+        ("fields", "任务字段无效"),
+        ("length", "未完整输出"),
+        ("blank", "返回空内容"),
+    ]
+    scenario = ""
+    calls = []
+
+    def respond(route):
+        calls.append(scenario)
+        statuses = {"auth": 401, "balance": 402, "limit": 429, "unavailable": 503, "timeout": 504}
+        if scenario in statuses:
+            route.fulfill(status=statuses[scenario], body="private upstream diagnostic")
+        elif scenario == "network":
+            route.abort("internetdisconnected")
+        else:
+            content = {"json": "not json", "fields": '{"tasks":[{"title":"残缺草稿"}]}',
+                       "length": '{"tasks":[]}', "blank": " "}[scenario]
+            finish = "length" if scenario == "length" else "stop"
+            route.fulfill(json={"choices": [{"finish_reason": finish, "message": {"content": content}}]})
+
+    try:
+        page.route("https://api.deepseek.com/chat/completions", respond)
+        page.goto(static_site)
+        page.get_by_role("button", name="新增任务", exact=True).click()
+        page.get_by_label("任务名称", exact=True).fill("保留的任务")
+        page.get_by_role("button", name="保存任务", exact=True).click()
+        rows = page.get_by_test_id("task-row")
+        expect(rows).to_have_count(1)
+        page.get_by_role("button", name="解析设置").click()
+        page.get_by_label("解析方式").select_option("deepseek")
+        page.get_by_label("DeepSeek API Key").fill("invalid-local-fixture")
+        page.get_by_role("button", name="应用设置").click()
+        page.get_by_placeholder("今天有什么想做的？直接告诉我就好。").fill("整理实验结果")
+        before = context.storage_state(indexed_db=True)
+        for scenario, hint in cases:
+            page.get_by_role("button", name="AI 整理任务", exact=True).click()
+            expect(page.get_by_role("alert").filter(has_text=hint)).to_be_visible()
+            expect(rows).to_have_count(1)
+            expect(page.get_by_label("预览任务名称")).to_have_count(0)
+        assert calls == [key for key, _ in cases]
+        assert context.storage_state(indexed_db=True) == before
+        page.reload()
+        expect(rows).to_have_count(1)
+        expect(rows.first).to_contain_text("保留的任务")
+    finally:
+        context.close()
